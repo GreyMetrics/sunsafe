@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>SunSafe — UV Protection</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SunSafe">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --sun: #F5A623;
+  --sun-dim: #C47D10;
+  --bg: #0C0C0E;
+  --surface: #141416;
+  --surface2: #1C1C1F;
+  --border: rgba(255,255,255,0.07);
+  --text: #F0EEE8;
+  --muted: rgba(240,238,232,0.45);
+  --hint: rgba(240,238,232,0.25);
+  --green: #3ECA7F;
+  --yellow: #F5C842;
+  --orange: #F5803A;
+  --red: #EF4545;
+  --purple: #B06EF5;
+  --radius: 20px;
+  --radius-sm: 12px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+html, body {
+  height:100%; background:var(--bg); color:var(--text);
+  font-family:'DM Sans', sans-serif; overflow:hidden;
+}
+
+.app {
+  max-width:430px; margin:0 auto; height:100vh;
+  display:flex; flex-direction:column; position:relative; overflow:hidden;
+}
+
+/* ── GLOW BG ── */
+.glow {
+  position:absolute; border-radius:50%; pointer-events:none; z-index:0;
+  transition: background 1s, opacity 1s;
+}
+.glow-main {
+  width:500px; height:500px; top:-180px; left:50%; transform:translateX(-50%);
+  background:radial-gradient(circle, rgba(245,166,35,0.18) 0%, transparent 70%);
+  animation: breathe 5s ease-in-out infinite;
+}
+@keyframes breathe { 0%,100%{opacity:.7;transform:translateX(-50%) scale(1)} 50%{opacity:1;transform:translateX(-50%) scale(1.08)} }
+
+/* ── SCREENS ── */
+.screen { display:none; flex-direction:column; flex:1; overflow:hidden; position:relative; z-index:1; }
+.screen.active { display:flex; }
+
+/* ══ ONBOARDING ══ */
+#s-onboard {
+  padding:56px 28px 40px;
+  justify-content:space-between;
+  background: linear-gradient(180deg, rgba(245,166,35,0.04) 0%, transparent 50%);
+}
+
+.logo { display:flex; align-items:center; gap:12px; }
+.logo-icon {
+  width:48px; height:48px; border-radius:14px;
+  background:var(--sun); display:flex; align-items:center; justify-content:center;
+  font-size:24px; flex-shrink:0;
+}
+.logo-text { font-family:'Syne',sans-serif; font-size:28px; font-weight:800; letter-spacing:-0.5px; }
+.logo-text em { color:var(--sun); font-style:normal; }
+.logo-sub { font-size:13px; color:var(--muted); margin-top:3px; }
+
+.onboard-mid {}
+.ob-title { font-family:'Syne',sans-serif; font-size:22px; font-weight:700; margin-bottom:6px; }
+.ob-sub { font-size:14px; color:var(--muted); margin-bottom:24px; line-height:1.6; }
+
+.skin-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.skin-card {
+  border:1.5px solid var(--border); border-radius:var(--radius-sm);
+  padding:14px 8px; cursor:pointer; text-align:center;
+  background:var(--surface); transition:all .2s;
+}
+.skin-card:active { transform:scale(0.97); }
+.skin-card.sel { border-color:var(--sun); background:rgba(245,166,35,0.1); }
+.swatch { width:40px; height:40px; border-radius:50%; margin:0 auto 9px; border:2px solid rgba(255,255,255,0.1); }
+.skin-name { font-size:12px; font-weight:500; }
+.skin-type { font-size:10px; color:var(--hint); margin-top:2px; }
+
+.btn-main {
+  width:100%; padding:17px; margin-top:24px;
+  background:var(--sun); border:none; border-radius:var(--radius-sm);
+  font-family:'Syne',sans-serif; font-size:16px; font-weight:700; color:#000;
+  cursor:pointer; transition:all .2s; letter-spacing:0.2px;
+}
+.btn-main:active { transform:scale(0.98); background:#d9901a; }
+.btn-main:disabled { opacity:.3; cursor:default; }
+
+/* ══ DASHBOARD ══ */
+#s-dash { overflow-y:auto; }
+#s-dash::-webkit-scrollbar { display:none; }
+
+.dash-inner { padding:52px 22px 100px; }
+
+.topbar {
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:28px;
+}
+.loc-pill {
+  display:flex; align-items:center; gap:7px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:30px; padding:7px 14px; font-size:13px; color:var(--muted);
+  cursor:pointer; transition:all .2s;
+}
+.loc-pill:active { background:var(--surface2); }
+.loc-dot { width:7px; height:7px; background:var(--green); border-radius:50%; animation:blink 2s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.prof-btn {
+  width:38px; height:38px; background:var(--surface); border:1px solid var(--border);
+  border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  font-size:17px; transition:all .2s;
+}
+.prof-btn:active { background:var(--surface2); }
+
+/* UV Ring */
+.uv-hero { text-align:center; margin-bottom:24px; }
+.ring-wrap { position:relative; width:200px; height:200px; margin:0 auto 18px; }
+.ring-wrap svg { width:200px; height:200px; transform:rotate(-90deg); }
+.ring-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.uv-num { font-family:'Syne',sans-serif; font-size:62px; font-weight:800; line-height:1; letter-spacing:-2px; }
+.uv-lbl { font-size:11px; color:var(--hint); letter-spacing:2px; text-transform:uppercase; margin-top:2px; }
+
+.uv-level { font-family:'Syne',sans-serif; font-size:26px; font-weight:700; }
+.uv-pill {
+  display:inline-block; padding:5px 16px; border-radius:30px;
+  font-size:13px; font-weight:500; margin-top:7px; letter-spacing:0.3px;
+}
+
+/* Cards */
+.cards-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+.card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:18px;
+}
+.card-icon { font-size:20px; margin-bottom:10px; }
+.card-val { font-family:'Syne',sans-serif; font-size:24px; font-weight:700; }
+.card-lbl { font-size:11px; color:var(--muted); margin-top:3px; letter-spacing:0.3px; }
+
+.burn-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:18px 20px;
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom:10px;
+}
+.burn-lbl { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:5px; }
+.burn-val { font-family:'Syne',sans-serif; font-size:34px; font-weight:800; line-height:1; }
+.burn-unit { font-size:15px; color:var(--muted); margin-left:3px; }
+.spf-tag {
+  background:var(--sun); color:#000; border-radius:var(--radius-sm);
+  padding:10px 18px; font-family:'Syne',sans-serif; font-weight:800; font-size:17px;
+}
+
+/* Hourly */
+.section-lbl { font-size:11px; color:var(--hint); letter-spacing:2px; text-transform:uppercase; margin-bottom:10px; }
+.hourly-scroll { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:10px; }
+.hourly-scroll::-webkit-scrollbar { display:none; }
+.hour-chip {
+  flex:0 0 auto; text-align:center; min-width:58px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius-sm); padding:11px 10px; transition:all .2s;
+}
+.hour-chip.peak { border-color:rgba(245,166,35,0.4); background:rgba(245,166,35,0.08); }
+.hour-chip.now { border-color:var(--sun); background:rgba(245,166,35,0.14); }
+.h-time { font-size:10px; color:var(--hint); margin-bottom:5px; }
+.h-uv { font-family:'Syne',sans-serif; font-size:16px; font-weight:700; }
+.h-bar { width:100%; height:3px; background:rgba(255,255,255,0.07); border-radius:2px; margin-top:6px; overflow:hidden; }
+.h-fill { height:100%; border-radius:2px; background:var(--sun); transition:width .6s; }
+
+/* Tip */
+.tip-card {
+  background:rgba(245,166,35,0.07); border:1px solid rgba(245,166,35,0.2);
+  border-radius:var(--radius); padding:16px 18px; margin-bottom:10px;
+  display:flex; gap:12px; align-items:flex-start;
+}
+.tip-icon { font-size:22px; flex-shrink:0; }
+.tip-text { font-size:14px; color:rgba(240,238,232,0.75); line-height:1.6; }
+.tip-text strong { color:var(--sun); font-weight:500; }
+
+/* Remind btn */
+.remind-btn {
+  width:100%; padding:16px;
+  background:transparent; border:1.5px solid rgba(245,166,35,0.35);
+  border-radius:var(--radius-sm); font-family:'Syne',sans-serif;
+  font-size:15px; font-weight:600; color:var(--sun); cursor:pointer;
+  transition:all .2s; letter-spacing:0.2px;
+}
+.remind-btn:active { background:rgba(245,166,35,0.1); transform:scale(0.99); }
+
+/* Loading state */
+.loading-state { text-align:center; padding:60px 0; }
+.spinner {
+  width:40px; height:40px; border:2px solid var(--border);
+  border-top-color:var(--sun); border-radius:50%;
+  animation:spin .8s linear infinite; margin:0 auto 16px;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+.loading-text { font-size:14px; color:var(--muted); }
+
+/* Error state */
+.error-card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:24px; text-align:center; margin:20px 0;
+}
+.error-icon { font-size:32px; margin-bottom:12px; }
+.error-title { font-family:'Syne',sans-serif; font-size:16px; font-weight:700; margin-bottom:6px; }
+.error-text { font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:16px; }
+.retry-btn {
+  padding:10px 24px; background:var(--sun); border:none; border-radius:var(--radius-sm);
+  font-family:'Syne',sans-serif; font-weight:700; font-size:14px; color:#000; cursor:pointer;
+}
+
+/* ══ FORECAST ══ */
+#s-forecast { overflow-y:auto; }
+#s-forecast::-webkit-scrollbar { display:none; }
+.forecast-inner { padding:52px 22px 100px; }
+
+.forecast-list { display:flex; flex-direction:column; gap:10px; margin-top:16px; }
+.fc-item {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:16px 18px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.fc-day { font-family:'Syne',sans-serif; font-size:16px; font-weight:700; }
+.fc-desc { font-size:12px; color:var(--muted); margin-top:3px; }
+.fc-uv { font-family:'Syne',sans-serif; font-size:26px; font-weight:800; }
+.fc-badge { font-size:11px; font-weight:600; padding:3px 10px; border-radius:8px; margin-top:4px; text-align:center; }
+
+/* ══ PROFILE ══ */
+#s-profile { overflow-y:auto; }
+#s-profile::-webkit-scrollbar { display:none; }
+.profile-inner { padding:52px 22px 100px; }
+
+.prof-header { text-align:center; margin-bottom:28px; }
+.prof-avatar {
+  width:80px; height:80px; border-radius:50%; background:var(--sun);
+  display:flex; align-items:center; justify-content:center;
+  font-size:36px; margin:0 auto 14px;
+}
+.prof-name { font-family:'Syne',sans-serif; font-size:22px; font-weight:800; }
+.prof-skin { font-size:14px; color:var(--muted); margin-top:4px; }
+
+.stats-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:24px; }
+.stat-box { background:var(--surface); border-radius:var(--radius-sm); padding:16px 8px; text-align:center; }
+.stat-val { font-family:'Syne',sans-serif; font-size:26px; font-weight:800; color:var(--sun); }
+.stat-lbl { font-size:10px; color:var(--hint); margin-top:3px; letter-spacing:.5px; }
+
+.section-hdr { font-family:'Syne',sans-serif; font-size:15px; font-weight:700; margin:22px 0 12px; letter-spacing:0.3px; }
+.setting-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 0; border-bottom:1px solid var(--border);
+}
+.setting-name { font-size:15px; font-weight:500; }
+.setting-desc { font-size:12px; color:var(--hint); margin-top:2px; }
+.toggle {
+  width:46px; height:26px; border-radius:13px; background:var(--sun);
+  position:relative; cursor:pointer; transition:background .2s; flex-shrink:0;
+}
+.toggle.off { background:var(--surface2); border:1px solid var(--border); }
+.tog-knob {
+  width:22px; height:22px; background:#fff; border-radius:50%;
+  position:absolute; top:2px; left:22px; transition:left .2s;
+}
+.toggle.off .tog-knob { left:2px; }
+
+.edit-link { font-size:13px; color:var(--sun); cursor:pointer; }
+
+/* ══ NAV BAR ══ */
+.nav {
+  position:absolute; bottom:0; left:0; right:0;
+  display:flex; justify-content:space-around;
+  background:rgba(12,12,14,0.95); backdrop-filter:blur(20px);
+  border-top:1px solid var(--border); padding:10px 0 max(16px, env(safe-area-inset-bottom));
+  z-index:10;
+}
+.nav-item {
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  font-size:10px; color:var(--hint); cursor:pointer; padding:4px 24px;
+  transition:color .2s; letter-spacing:.5px; text-transform:uppercase;
+}
+.nav-item.on { color:var(--sun); }
+.nav-ico { font-size:22px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="glow glow-main" id="glowMain"></div>
+
+  <!-- ══ ONBOARDING ══ -->
+  <div class="screen active" id="s-onboard">
+    <div class="logo">
+      <div class="logo-icon">☀️</div>
+      <div>
+        <div class="logo-text"><em>Sun</em>Safe</div>
+        <div class="logo-sub">Your personal UV protection guide</div>
+      </div>
+    </div>
+
+    <div class="onboard-mid">
+      <div class="ob-title">What's your skin type?</div>
+      <div class="ob-sub">We personalise your burn time, SPF recommendations and reminders based on your skin.</div>
+      <div class="skin-grid">
+        <div class="skin-card" onclick="pickSkin(this,1)">
+          <div class="swatch" style="background:#FDECC4"></div>
+          <div class="skin-name">Very Fair</div>
+          <div class="skin-type">Type I</div>
+        </div>
+        <div class="skin-card" onclick="pickSkin(this,2)">
+          <div class="swatch" style="background:#F5D5A0"></div>
+          <div class="skin-name">Fair</div>
+          <div class="skin-type">Type II</div>
+        </div>
+        <div class="skin-card" onclick="pickSkin(this,3)">
+          <div class="swatch" style="background:#D4A574"></div>
+          <div class="skin-name">Medium</div>
+          <div class="skin-type">Type III</div>
+        </div>
+        <div class="skin-card" onclick="pickSkin(this,4)">
+          <div class="swatch" style="background:#A0724A"></div>
+          <div class="skin-name">Olive</div>
+          <div class="skin-type">Type IV</div>
+        </div>
+        <div class="skin-card" onclick="pickSkin(this,5)">
+          <div class="swatch" style="background:#7A4F2A"></div>
+          <div class="skin-name">Brown</div>
+          <div class="skin-type">Type V</div>
+        </div>
+        <div class="skin-card" onclick="pickSkin(this,6)">
+          <div class="swatch" style="background:#3D1F0A"></div>
+          <div class="skin-name">Dark</div>
+          <div class="skin-type">Type VI</div>
+        </div>
+      </div>
+      <button class="btn-main" id="startBtn" disabled onclick="startApp()">Get my protection plan →</button>
+    </div>
+  </div>
+
+  <!-- ══ DASHBOARD ══ -->
+  <div class="screen" id="s-dash">
+    <div class="dash-inner" id="dashInner">
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <div class="loading-text">Getting your UV data…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ FORECAST ══ -->
+  <div class="screen" id="s-forecast">
+    <div class="forecast-inner" id="forecastInner">
+      <div class="topbar">
+        <div class="loc-pill"><div class="loc-dot"></div><span id="fc-loc">Detecting…</span></div>
+      </div>
+      <div class="section-lbl">7-Day UV outlook</div>
+      <div class="forecast-list" id="forecastList"></div>
+    </div>
+  </div>
+
+  <!-- ══ PROFILE ══ -->
+  <div class="screen" id="s-profile">
+    <div class="profile-inner">
+      <div class="prof-header">
+        <div class="prof-avatar">☀️</div>
+        <div class="prof-name">SunSafe</div>
+        <div class="prof-skin" id="profSkinLbl">—</div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-box"><div class="stat-val" id="st-days">1</div><div class="stat-lbl">Days</div></div>
+        <div class="stat-box"><div class="stat-val" id="st-checks">1</div><div class="stat-lbl">Checks</div></div>
+        <div class="stat-box"><div class="stat-val" id="st-safe">0</div><div class="stat-lbl">Reminders</div></div>
+      </div>
+
+      <div class="section-hdr">Notifications</div>
+      <div class="setting-row">
+        <div><div class="setting-name">Morning UV alert</div><div class="setting-desc">Daily 8am forecast summary</div></div>
+        <div class="toggle" id="tog-morning" onclick="toggleSwitch('tog-morning')"><div class="tog-knob"></div></div>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-name">Reapply reminders</div><div class="setting-desc">Every 2 hours when UV is high</div></div>
+        <div class="toggle" id="tog-reapply" onclick="toggleSwitch('tog-reapply')"><div class="tog-knob"></div></div>
+      </div>
+      <div class="setting-row">
+        <div><div class="setting-name">Peak UV warning</div><div class="setting-desc">Alert when UV exceeds your threshold</div></div>
+        <div class="toggle off" id="tog-peak" onclick="toggleSwitch('tog-peak')"><div class="tog-knob"></div></div>
+      </div>
+
+      <div class="section-hdr">Skin type</div>
+      <div class="setting-row">
+        <div><div class="setting-name" id="skinDisplay">—</div><div class="setting-desc" id="skinDescDisplay">—</div></div>
+        <span class="edit-link" onclick="goScreen('s-onboard')">Edit</span>
+      </div>
+
+      <div class="section-hdr">Location</div>
+      <div class="setting-row">
+        <div><div class="setting-name" id="profLocName">Detecting…</div><div class="setting-desc" id="profLocCoords">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ NAV ══ -->
+  <nav class="nav" id="mainNav" style="display:none">
+    <div class="nav-item on" id="n-dash" onclick="goTab('dash')">
+      <div class="nav-ico">☀️</div>Today
+    </div>
+    <div class="nav-item" id="n-forecast" onclick="goTab('forecast')">
+      <div class="nav-ico">📅</div>Forecast
+    </div>
+    <div class="nav-item" id="n-profile" onclick="goTab('profile')">
+      <div class="nav-ico">👤</div>Profile
+    </div>
+  </nav>
+</div>
+
+<script>
+/* ══════════════════════════════
+   DATA & STATE
+══════════════════════════════ */
+const SKIN = {
+  1:{label:'Type I — Very Fair', desc:'Always burns, never tans', burnBase:8,  spf:'50+'},
+  2:{label:'Type II — Fair',     desc:'Burns easily, rarely tans', burnBase:12, spf:'50+'},
+  3:{label:'Type III — Medium',  desc:'Sometimes burns, tans slowly', burnBase:20, spf:'30+'},
+  4:{label:'Type IV — Olive',    desc:'Rarely burns, tans easily', burnBase:35, spf:'30'},
+  5:{label:'Type V — Brown',     desc:'Very rarely burns, deeply tans', burnBase:60, spf:'15+'},
+  6:{label:'Type VI — Dark',     desc:'Never burns, always tans', burnBase:90, spf:'15'}
+};
+
+const UV_LEVELS = [
+  {max:2,  name:'Low',       color:'#3ECA7F', pillBg:'rgba(62,202,127,0.15)',
+   tip:'Low UV today — no protection needed for most skin types.'},
+  {max:5,  name:'Moderate',  color:'#F5C842', pillBg:'rgba(245,200,66,0.15)',
+   tip:'Apply <strong>SPF 30+</strong> if you\'ll be outdoors over 30 minutes.'},
+  {max:7,  name:'High',      color:'#F5803A', pillBg:'rgba(245,128,58,0.15)',
+   tip:'Apply <strong>SPF 50+</strong> now. Reapply every <strong>2 hours</strong>. Wear a hat.'},
+  {max:10, name:'Very High', color:'#EF4545', pillBg:'rgba(239,69,69,0.15)',
+   tip:'Protection essential. <strong>SPF 50+</strong>, hat, long sleeves. Seek shade 10am–4pm.'},
+  {max:99, name:'Extreme',   color:'#B06EF5', pillBg:'rgba(176,110,245,0.15)',
+   tip:'<strong>Avoid sun 10am–4pm.</strong> Maximum SPF, cover up completely. This is NZ-level UV.'}
+];
+
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+let state = {
+  skinType: 0,
+  lat: -36.86,
+  lng: 174.76,
+  locationName: 'Auckland, NZ',
+  weatherData: null,
+  checks: 0,
+  reminders: 0,
+  startDate: Date.now()
+};
+
+/* ══════════════════════════════
+   ONBOARDING
+══════════════════════════════ */
+function pickSkin(el, type) {
+  document.querySelectorAll('.skin-card').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+  state.skinType = type;
+  document.getElementById('startBtn').disabled = false;
+}
+
+function startApp() {
+  saveState();
+  document.getElementById('mainNav').style.display = 'flex';
+  goScreen('s-dash');
+  initLocation();
+}
+
+/* ══════════════════════════════
+   LOCATION + API
+══════════════════════════════ */
+function initLocation() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        state.lat = pos.coords.latitude;
+        state.lng = pos.coords.longitude;
+        reverseGeocode(state.lat, state.lng);
+        fetchUV();
+      },
+      () => { fetchUV(); } // fallback to Auckland
+    );
+  } else {
+    fetchUV();
+  }
+}
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
+    const d = await r.json();
+    const city = d.address.city || d.address.town || d.address.suburb || d.address.village || 'Your location';
+    const country = d.address.country_code ? d.address.country_code.toUpperCase() : '';
+    state.locationName = country ? `${city}, ${country}` : city;
+    updateLocationLabels();
+  } catch(e) {}
+}
+
+async function fetchUV() {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast`
+      + `?latitude=${state.lat}&longitude=${state.lng}`
+      + `&hourly=uv_index,temperature_2m,cloudcover`
+      + `&daily=uv_index_max`
+      + `&timezone=auto&forecast_days=7`;
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API error');
+    state.weatherData = await res.json();
+    state.checks++;
+    saveState();
+    renderDash();
+    renderForecast();
+  } catch(e) {
+    renderError();
+  }
+}
+
+function updateLocationLabels() {
+  const locEls = document.querySelectorAll('.loc-label');
+  locEls.forEach(el => el.textContent = state.locationName);
+  document.getElementById('fc-loc').textContent = state.locationName;
+  document.getElementById('profLocName').textContent = state.locationName;
+  document.getElementById('profLocCoords').textContent =
+    `Lat ${state.lat.toFixed(2)}° · Lng ${state.lng.toFixed(2)}°`;
+}
+
+/* ══════════════════════════════
+   RENDER DASHBOARD
+══════════════════════════════ */
+function renderDash() {
+  const d = state.weatherData;
+  const hour = new Date().getHours();
+  const uv   = Math.round(d.hourly.uv_index[hour] || 0);
+  const temp = Math.round(d.hourly.temperature_2m[hour] || 22);
+  const cloud= Math.round(d.hourly.cloudcover[hour] || 0);
+  const skin = SKIN[state.skinType] || SKIN[2];
+  const level = UV_LEVELS.find(l => uv <= l.max) || UV_LEVELS[UV_LEVELS.length-1];
+  const burnMins = Math.max(Math.round(skin.burnBase / Math.max(uv / 8, 0.5)), 3);
+
+  // Update glow color
+  document.getElementById('glowMain').style.background =
+    `radial-gradient(circle, ${level.color}30 0%, transparent 70%)`;
+
+  const dashInner = document.getElementById('dashInner');
+  dashInner.innerHTML = `
+    <div class="topbar">
+      <div class="loc-pill" onclick="initLocation()">
+        <div class="loc-dot"></div>
+        <span class="loc-label">${state.locationName}</span>
+      </div>
+      <div class="prof-btn" onclick="goTab('profile')">👤</div>
+    </div>
+
+    <div class="uv-hero">
+      <div class="ring-wrap">
+        <svg viewBox="0 0 200 200">
+          <circle cx="100" cy="100" r="84" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="14"/>
+          <circle id="uvArc" cx="100" cy="100" r="84" fill="none"
+            stroke="${level.color}" stroke-width="14" stroke-linecap="round"
+            stroke-dasharray="527.8" stroke-dashoffset="527.8"
+            style="transition:stroke-dashoffset 1.4s cubic-bezier(.4,0,.2,1)"/>
+        </svg>
+        <div class="ring-center">
+          <div class="uv-num" id="uvNum">0</div>
+          <div class="uv-lbl">UV Index</div>
+        </div>
+      </div>
+      <div class="uv-level">${level.name}</div>
+      <div class="uv-pill" style="background:${level.pillBg};color:${level.color}">${level.name} UV · ${uv <= 2 ? 'No action needed' : 'Protection required'}</div>
+    </div>
+
+    <div class="cards-2">
+      <div class="card">
+        <div class="card-icon">🌡️</div>
+        <div class="card-val">${temp}°C</div>
+        <div class="card-lbl">Temperature</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">⛅</div>
+        <div class="card-val">${cloud}%</div>
+        <div class="card-lbl">Cloud cover</div>
+      </div>
+    </div>
+
+    <div class="burn-card">
+      <div>
+        <div class="burn-lbl">Time to sunburn</div>
+        <div class="burn-val">${burnMins}<span class="burn-unit">min</span></div>
+      </div>
+      <div class="spf-tag">SPF ${skin.spf}</div>
+    </div>
+
+    <div class="section-lbl">Today's UV hour by hour</div>
+    <div class="hourly-scroll" id="hourlyRow"></div>
+
+    <div class="tip-card">
+      <div class="tip-icon">🧴</div>
+      <div class="tip-text">${level.tip}</div>
+    </div>
+
+    <button class="remind-btn" id="remindBtn" onclick="setReminder()">
+      ⏱ Remind me to reapply in 2 hours
+    </button>
+  `;
+
+  // Animate UV ring
+  setTimeout(() => {
+    const pct = Math.min(uv / 13, 1);
+    document.getElementById('uvArc').style.strokeDashoffset = 527.8 * (1 - pct);
+  }, 50);
+
+  // Animate number
+  let n = 0;
+  const timer = setInterval(() => {
+    n = Math.min(n + 0.35, uv);
+    const el = document.getElementById('uvNum');
+    if (el) el.textContent = Math.round(n);
+    else clearInterval(timer);
+    if (n >= uv) clearInterval(timer);
+  }, 25);
+
+  buildHourly(d.hourly, hour);
+  updateProfileUI();
+}
+
+function buildHourly(hourly, nowHour) {
+  const container = document.getElementById('hourlyRow');
+  if (!container) return;
+  const maxUV = Math.max(...hourly.uv_index.slice(0,24));
+  container.innerHTML = '';
+  for (let i = 0; i < 24; i++) {
+    const uv = Math.round(hourly.uv_index[i]);
+    if (uv === 0 && i > 20) continue;
+    const h = i % 12 || 12;
+    const ampm = i < 12 ? 'am' : 'pm';
+    const isNow = i === nowHour;
+    const isPeak = uv >= 10;
+    const pct = maxUV > 0 ? Math.round((uv / maxUV) * 100) : 0;
+    const chip = document.createElement('div');
+    chip.className = `hour-chip${isPeak?' peak':''}${isNow?' now':''}`;
+    chip.innerHTML = `<div class="h-time">${h}${ampm}</div><div class="h-uv">${uv}</div><div class="h-bar"><div class="h-fill" style="width:${pct}%"></div></div>`;
+    container.appendChild(chip);
+  }
+  // scroll to now
+  setTimeout(() => {
+    const nowChip = container.querySelector('.now');
+    if (nowChip) nowChip.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+  }, 200);
+}
+
+function renderError() {
+  document.getElementById('dashInner').innerHTML = `
+    <div class="topbar">
+      <div class="loc-pill"><div class="loc-dot" style="background:#EF4545"></div><span>Location error</span></div>
+    </div>
+    <div class="error-card">
+      <div class="error-icon">🌥️</div>
+      <div class="error-title">Couldn't load UV data</div>
+      <div class="error-text">Check your internet connection and try again. Make sure location access is enabled for best results.</div>
+      <button class="retry-btn" onclick="fetchUV()">Try again</button>
+    </div>
+  `;
+}
+
+/* ══════════════════════════════
+   RENDER FORECAST
+══════════════════════════════ */
+function renderForecast() {
+  const d = state.weatherData;
+  if (!d) return;
+  document.getElementById('fc-loc').textContent = state.locationName;
+  const list = document.getElementById('forecastList');
+  list.innerHTML = '';
+  const today = new Date().getDay();
+  d.daily.uv_index_max.forEach((uv, i) => {
+    uv = Math.round(uv);
+    const level = UV_LEVELS.find(l => uv <= l.max) || UV_LEVELS[UV_LEVELS.length-1];
+    const dayName = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : DAYS[(today + i) % 7];
+    const item = document.createElement('div');
+    item.className = 'fc-item';
+    item.innerHTML = `
+      <div>
+        <div class="fc-day">${dayName}</div>
+        <div class="fc-desc">${level.name} UV · Peak ${uv}</div>
+      </div>
+      <div style="text-align:center">
+        <div class="fc-uv" style="color:${level.color}">${uv}</div>
+        <div class="fc-badge" style="background:${level.pillBg};color:${level.color}">${level.name}</div>
+      </div>`;
+    list.appendChild(item);
+  });
+}
+
+/* ══════════════════════════════
+   PROFILE
+══════════════════════════════ */
+function updateProfileUI() {
+  const skin = SKIN[state.skinType] || SKIN[2];
+  document.getElementById('profSkinLbl').textContent = skin.label;
+  document.getElementById('skinDisplay').textContent = skin.label;
+  document.getElementById('skinDescDisplay').textContent = skin.desc;
+  document.getElementById('profLocName').textContent = state.locationName;
+  document.getElementById('profLocCoords').textContent =
+    `Lat ${state.lat.toFixed(2)}° · Lng ${state.lng.toFixed(2)}°`;
+  const days = Math.max(1, Math.floor((Date.now() - state.startDate) / 86400000) + 1);
+  document.getElementById('st-days').textContent = days;
+  document.getElementById('st-checks').textContent = state.checks;
+  document.getElementById('st-safe').textContent = state.reminders;
+}
+
+/* ══════════════════════════════
+   NOTIFICATIONS
+══════════════════════════════ */
+async function setReminder() {
+  const btn = document.getElementById('remindBtn');
+  const permission = await Notification.requestPermission();
+  if (permission === 'granted') {
+    state.reminders++;
+    saveState();
+    btn.textContent = '✅ Reminder set for 2 hours!';
+    btn.style.borderColor = 'rgba(62,202,127,0.5)';
+    btn.style.color = '#3ECA7F';
+    setTimeout(() => {
+      new Notification('SunSafe ☀️', {
+        body: 'Time to reapply sunscreen! SPF ' + (SKIN[state.skinType]||SKIN[2]).spf,
+        icon: 'icon-192.png'
+      });
+      btn.textContent = '⏱ Remind me to reapply in 2 hours';
+      btn.style.borderColor = 'rgba(245,166,35,0.35)';
+      btn.style.color = 'var(--sun)';
+    }, 2 * 60 * 60 * 1000);
+  } else {
+    btn.textContent = '⚠️ Enable notifications in Settings';
+    setTimeout(() => { btn.textContent = '⏱ Remind me to reapply in 2 hours'; }, 3000);
+  }
+}
+
+function scheduleMorningAlert() {
+  const now = new Date();
+  const next8 = new Date(); next8.setHours(8,0,0,0);
+  if (now >= next8) next8.setDate(next8.getDate() + 1);
+  setTimeout(async () => {
+    if (Notification.permission === 'granted') {
+      await fetchUV();
+      const d = state.weatherData;
+      const peakUV = d ? Math.round(Math.max(...d.daily.uv_index_max.slice(0,1))) : '—';
+      new Notification('SunSafe — Good morning ☀️', {
+        body: `Today's peak UV: ${peakUV}. Check SunSafe before heading out!`,
+        icon: 'icon-192.png'
+      });
+    }
+    scheduleMorningAlert();
+  }, next8 - now);
+}
+
+/* ══════════════════════════════
+   NAV & ROUTING
+══════════════════════════════ */
+function goTab(tab) {
+  const map = {dash:'s-dash', forecast:'s-forecast', profile:'s-profile'};
+  goScreen(map[tab]);
+  ['dash','forecast','profile'].forEach(t => {
+    document.getElementById('n-'+t).classList.toggle('on', t===tab);
+  });
+  if (tab === 'forecast') renderForecast();
+  if (tab === 'profile') updateProfileUI();
+}
+
+function goScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 's-onboard') document.getElementById('mainNav').style.display = 'none';
+}
+
+function toggleSwitch(id) {
+  document.getElementById(id).classList.toggle('off');
+}
+
+/* ══════════════════════════════
+   PERSIST STATE
+══════════════════════════════ */
+function saveState() {
+  try { sessionStorage.setItem('ss', JSON.stringify(state)); } catch(e){}
+}
+function loadState() {
+  try {
+    const s = sessionStorage.getItem('ss');
+    if (s) state = {...state, ...JSON.parse(s)};
+  } catch(e){}
+}
+
+/* ══════════════════════════════
+   INIT
+══════════════════════════════ */
+loadState();
+if (state.skinType) {
+  document.getElementById('mainNav').style.display = 'flex';
+  goScreen('s-dash');
+  initLocation();
+  scheduleMorningAlert();
+}
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>

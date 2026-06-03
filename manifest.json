@@ -1,0 +1,26 @@
+{
+  "name": "SunSafe — UV Protection",
+  "short_name": "SunSafe",
+  "description": "Your personal UV protection guide. Real-time UV index, burn time calculator and sunscreen reminders.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0C0C0E",
+  "theme_color": "#0C0C0E",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["health", "lifestyle", "weather"]
+}

@@ -759,6 +759,57 @@ function updateProfileUI() {
 /* ══════════════════════════════
    NOTIFICATIONS
 ══════════════════════════════ */
+// Reusable countdown — call on load if reminder is still active
+function startReminderCountdown(endTime) {
+  const btn = document.getElementById('remindBtn');
+  if (!btn) return;
+  btn.disabled = false;
+  btn.style.borderColor = 'rgba(62,202,127,0.5)';
+  btn.style.color = '#3ECA7F';
+
+  const ticker = setInterval(() => {
+    const msLeft = endTime - Date.now();
+    if (msLeft <= 0) {
+      clearInterval(ticker);
+      clearReminder();
+      const el = document.getElementById('remindBtn');
+      if (el) {
+        el.textContent = '⏱ Remind me to reapply in 2 hours';
+        el.style.borderColor = 'rgba(245,166,35,0.35)';
+        el.style.color = 'var(--sun)';
+        el.disabled = false;
+      }
+      return;
+    }
+    const mLeft = Math.floor(msLeft / 60000);
+    const sLeft = Math.floor((msLeft % 60000) / 1000);
+    const el = document.getElementById('remindBtn');
+    if (el) el.textContent = `✅ Reapply in ${mLeft}m ${sLeft < 10 ? '0'+sLeft : sLeft}s`;
+  }, 1000);
+
+  // Fire notification when time is up
+  const msRemaining = endTime - Date.now();
+  if (msRemaining > 0) {
+    setTimeout(() => {
+      clearInterval(ticker);
+      clearReminder();
+      if (Notification.permission === 'granted') {
+        new Notification('SunSafe ☀️', {
+          body: 'Time to reapply sunscreen! Use SPF ' + (SKIN[state.skinType]||SKIN[2]).spf,
+          icon: 'icon-192.png'
+        });
+      }
+      const el = document.getElementById('remindBtn');
+      if (el) {
+        el.textContent = '⏱ Remind me to reapply in 2 hours';
+        el.style.borderColor = 'rgba(245,166,35,0.35)';
+        el.style.color = 'var(--sun)';
+        el.disabled = false;
+      }
+    }, msRemaining);
+  }
+}
+
 async function setReminder() {
   const btn = document.getElementById('remindBtn');
   // Show loading state immediately
@@ -768,37 +819,10 @@ async function setReminder() {
   if (permission === 'granted') {
     state.reminders++;
     saveState();
-    // Start 2-hour countdown on button
+    // Start 2-hour countdown, save to localStorage so it survives refresh
     const endTime = Date.now() + 2 * 60 * 60 * 1000;
-    btn.disabled = false;
-    btn.style.borderColor = 'rgba(62,202,127,0.5)';
-    btn.style.color = '#3ECA7F';
-
-    // Live countdown ticker
-    const ticker = setInterval(() => {
-      const msLeft = endTime - Date.now();
-      if (msLeft <= 0) { clearInterval(ticker); return; }
-      const mLeft = Math.floor(msLeft / 60000);
-      const sLeft = Math.floor((msLeft % 60000) / 1000);
-      const el = document.getElementById('remindBtn');
-      if (el) el.textContent = `✅ Reapply in ${mLeft}m ${sLeft < 10 ? '0'+sLeft : sLeft}s`;
-    }, 1000);
-
-    // Fire notification after 2 hours
-    setTimeout(() => {
-      clearInterval(ticker);
-      new Notification('SunSafe ☀️', {
-        body: 'Time to reapply sunscreen! Use SPF ' + (SKIN[state.skinType]||SKIN[2]).spf,
-        icon: 'icon-192.png'
-      });
-      const el = document.getElementById('remindBtn');
-      if (el) {
-        el.textContent = '⏱ Remind me to reapply in 2 hours';
-        el.style.borderColor = 'rgba(245,166,35,0.35)';
-        el.style.color = 'var(--sun)';
-        el.disabled = false;
-      }
-    }, 2 * 60 * 60 * 1000);
+    saveReminder(endTime);
+    startReminderCountdown(endTime);
 
   } else if (permission === 'denied') {
     btn.disabled = false;
@@ -862,13 +886,31 @@ function toggleSwitch(id) {
    PERSIST STATE
 ══════════════════════════════ */
 function saveState() {
-  try { sessionStorage.setItem('ss', JSON.stringify(state)); } catch(e){}
+  try { localStorage.setItem('sunsafe_state', JSON.stringify(state)); } catch(e){}
 }
 function loadState() {
   try {
-    const s = sessionStorage.getItem('ss');
+    const s = localStorage.getItem('sunsafe_state');
     if (s) state = {...state, ...JSON.parse(s)};
   } catch(e){}
+}
+
+// Persist active reminder across sessions
+function saveReminder(endTime) {
+  try { localStorage.setItem('sunsafe_reminder', String(endTime)); } catch(e){}
+}
+function loadReminder() {
+  try {
+    const t = localStorage.getItem('sunsafe_reminder');
+    if (!t) return null;
+    const endTime = parseInt(t);
+    if (endTime > Date.now()) return endTime; // still active
+    localStorage.removeItem('sunsafe_reminder'); // expired
+    return null;
+  } catch(e){ return null; }
+}
+function clearReminder() {
+  try { localStorage.removeItem('sunsafe_reminder'); } catch(e){}
 }
 
 /* ══════════════════════════════
@@ -880,6 +922,13 @@ if (state.skinType) {
   goScreen('s-dash');
   initLocation();
   scheduleMorningAlert();
+
+  // Restore active reminder countdown if it survived a refresh
+  const savedReminder = loadReminder();
+  if (savedReminder) {
+    // Wait for renderDash to inject the button, then start countdown
+    setTimeout(() => startReminderCountdown(savedReminder), 1500);
+  }
 }
 
 // Register service worker

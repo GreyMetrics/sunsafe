@@ -438,15 +438,27 @@ html, body {
    DATA & STATE
 ══════════════════════════════ */
 const SKIN = {
-  1:{label:'Type I — Very Fair', desc:'Always burns, never tans', burnBase:8,  spf:'50+'},
-  2:{label:'Type II — Fair',     desc:'Burns easily, rarely tans', burnBase:12, spf:'50+'},
-  3:{label:'Type III — Medium',  desc:'Sometimes burns, tans slowly', burnBase:20, spf:'30+'},
-  4:{label:'Type IV — Olive',    desc:'Rarely burns, tans easily', burnBase:35, spf:'30'},
-  5:{label:'Type V — Brown',     desc:'Very rarely burns, deeply tans', burnBase:60, spf:'15+'},
-  6:{label:'Type VI — Dark',     desc:'Never burns, always tans', burnBase:90, spf:'15'}
+  // MED = Minimal Erythemal Dose in minutes at UV Index 1 (WHO/Cancer Council AU standard)
+  // Burn time (min) = MED ÷ UV Index
+  1:{label:'Type I — Very Fair', desc:'Always burns, never tans', med:67,  spf:'50+'},
+  2:{label:'Type II — Fair',     desc:'Burns easily, rarely tans', med:100, spf:'50+'},
+  3:{label:'Type III — Medium',  desc:'Sometimes burns, tans slowly', med:200, spf:'30+'},
+  4:{label:'Type IV — Olive',    desc:'Rarely burns, tans easily', med:300, spf:'30'},
+  5:{label:'Type V — Brown',     desc:'Very rarely burns, deeply tans', med:400, spf:'15+'},
+  6:{label:'Type VI — Dark',     desc:'Never burns, always tans', med:500, spf:'15'}
 };
 
+// WHO formula: Burn Time (min) = MED ÷ UV Index
+// At UV=0 there's no burn risk, show "No risk"
+function calcBurnTime(skinType, uv) {
+  if (uv <= 0) return null; // no UV = no burn
+  const skin = SKIN[skinType] || SKIN[2];
+  return Math.round(skin.med / uv);
+}
+
 const UV_LEVELS = [
+  {max:0,  name:'None',      color:'#6B7280', pillBg:'rgba(107,114,128,0.15)',
+   tip:'UV Index is 0 — no UV radiation right now. Enjoy the evening! 🌙'},
   {max:2,  name:'Low',       color:'#3ECA7F', pillBg:'rgba(62,202,127,0.15)',
    tip:'Low UV today — no protection needed for most skin types.'},
   {max:5,  name:'Moderate',  color:'#F5C842', pillBg:'rgba(245,200,66,0.15)',
@@ -559,7 +571,13 @@ function renderDash() {
   const cloud= Math.round(d.hourly.cloudcover[hour] || 0);
   const skin = SKIN[state.skinType] || SKIN[2];
   const level = UV_LEVELS.find(l => uv <= l.max) || UV_LEVELS[UV_LEVELS.length-1];
-  const burnMins = Math.max(Math.round(skin.burnBase / Math.max(uv / 8, 0.5)), 3);
+  // WHO formula: Burn Time = MED ÷ UV Index
+  const burnMins = calcBurnTime(state.skinType, uv);
+  const burnDisplay = burnMins === null
+    ? '<span style="font-size:22px;line-height:1.2">No risk</span>'
+    : burnMins >= 60
+      ? `${Math.floor(burnMins/60)}<span class="burn-unit">hr</span> ${burnMins%60}<span class="burn-unit">min</span>`
+      : `${burnMins}<span class="burn-unit">min</span>`;
 
   // Update glow color
   document.getElementById('glowMain').style.background =
@@ -590,7 +608,7 @@ function renderDash() {
         </div>
       </div>
       <div class="uv-level">${level.name}</div>
-      <div class="uv-pill" style="background:${level.pillBg};color:${level.color}">${level.name} UV · ${uv <= 2 ? 'No action needed' : 'Protection required'}</div>
+      <div class="uv-pill" style="background:${level.pillBg};color:${level.color}">${level.name} UV · ${uv === 0 ? 'No UV right now 🌙' : uv <= 2 ? 'No action needed' : 'Protection required'}</div>
     </div>
 
     <div class="cards-2">
@@ -609,7 +627,7 @@ function renderDash() {
     <div class="burn-card">
       <div>
         <div class="burn-lbl">Time to sunburn</div>
-        <div class="burn-val">${burnMins}<span class="burn-unit">min</span></div>
+        <div class="burn-val">${burnDisplay}</div>
       </div>
       <div class="spf-tag">SPF ${skin.spf}</div>
     </div>
@@ -622,9 +640,15 @@ function renderDash() {
       <div class="tip-text">${level.tip}</div>
     </div>
 
-    <button class="remind-btn" id="remindBtn" onclick="setReminder()">
-      ⏱ Remind me to reapply in 2 hours
-    </button>
+    ${uv === 0
+      ? `<div class="tip-card" style="justify-content:center;text-align:center">
+           <div style="font-size:28px;margin-bottom:6px">🌙</div>
+           <div class="tip-text">No sunscreen needed right now.<br>Check back in the morning!</div>
+         </div>`
+      : `<button class="remind-btn" id="remindBtn" onclick="setReminder()">
+           ⏱ Remind me to reapply in 2 hours
+         </button>`
+    }
   `;
 
   // Animate UV ring
@@ -737,25 +761,59 @@ function updateProfileUI() {
 ══════════════════════════════ */
 async function setReminder() {
   const btn = document.getElementById('remindBtn');
+  // Show loading state immediately
+  btn.textContent = '⏳ Setting reminder…';
+  btn.disabled = true;
   const permission = await Notification.requestPermission();
   if (permission === 'granted') {
     state.reminders++;
     saveState();
-    btn.textContent = '✅ Reminder set for 2 hours!';
+    // Start 2-hour countdown on button
+    const endTime = Date.now() + 2 * 60 * 60 * 1000;
+    btn.disabled = false;
     btn.style.borderColor = 'rgba(62,202,127,0.5)';
     btn.style.color = '#3ECA7F';
+
+    // Live countdown ticker
+    const ticker = setInterval(() => {
+      const msLeft = endTime - Date.now();
+      if (msLeft <= 0) { clearInterval(ticker); return; }
+      const mLeft = Math.floor(msLeft / 60000);
+      const sLeft = Math.floor((msLeft % 60000) / 1000);
+      const el = document.getElementById('remindBtn');
+      if (el) el.textContent = `✅ Reapply in ${mLeft}m ${sLeft < 10 ? '0'+sLeft : sLeft}s`;
+    }, 1000);
+
+    // Fire notification after 2 hours
     setTimeout(() => {
+      clearInterval(ticker);
       new Notification('SunSafe ☀️', {
-        body: 'Time to reapply sunscreen! SPF ' + (SKIN[state.skinType]||SKIN[2]).spf,
+        body: 'Time to reapply sunscreen! Use SPF ' + (SKIN[state.skinType]||SKIN[2]).spf,
         icon: 'icon-192.png'
       });
+      const el = document.getElementById('remindBtn');
+      if (el) {
+        el.textContent = '⏱ Remind me to reapply in 2 hours';
+        el.style.borderColor = 'rgba(245,166,35,0.35)';
+        el.style.color = 'var(--sun)';
+        el.disabled = false;
+      }
+    }, 2 * 60 * 60 * 1000);
+
+  } else if (permission === 'denied') {
+    btn.disabled = false;
+    btn.textContent = '⚠️ Allow notifications in browser Settings';
+    btn.style.borderColor = 'rgba(239,69,69,0.5)';
+    btn.style.color = '#EF4545';
+    setTimeout(() => {
       btn.textContent = '⏱ Remind me to reapply in 2 hours';
       btn.style.borderColor = 'rgba(245,166,35,0.35)';
       btn.style.color = 'var(--sun)';
-    }, 2 * 60 * 60 * 1000);
+    }, 4000);
   } else {
-    btn.textContent = '⚠️ Enable notifications in Settings';
-    setTimeout(() => { btn.textContent = '⏱ Remind me to reapply in 2 hours'; }, 3000);
+    // dismissed - reset
+    btn.disabled = false;
+    btn.textContent = '⏱ Remind me to reapply in 2 hours';
   }
 }
 
